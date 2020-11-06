@@ -283,11 +283,8 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		if len(cstats.Network) == 0 {
 			log.Info("No Network Stats for container: ", containerId)
 			continue
-		} else {
-			log.Info("Network Stats for container: ", containerId)
-			continue
 		}
-
+		
 		networkStats := cstats.Network
 
 		for _, networkInterface := range networkStats {
