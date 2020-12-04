@@ -45,8 +45,10 @@ type ContainerMetricsCollector struct {
 
 //info docker info
 type dockerInfo struct {
-	id   string
-	name string
+	id      string
+	name    string
+	network string
+	states  string
 }
 
 // NewContainerMetricsCollector constructs a new ContainerMetricsCollector
@@ -161,7 +163,7 @@ func containerClose(c hcsshim.Container) {
 // get docker container info
 func listContainers(client *docker.Client, containerID string) dockerInfo {
 	opts := docker.ListContainersOptions{}
-	p := dockerInfo{"", ""}
+	p := dockerInfo{"", "", "", ""}
 
 	containers, err := client.ListContainers(opts)
 	if err != nil {
@@ -176,7 +178,12 @@ func listContainers(client *docker.Client, containerID string) dockerInfo {
 			contStr = strings.ReplaceAll(contStr, "]", "")
 			contStr = strings.ReplaceAll(contStr, "/", "")
 
-			p := dockerInfo{container.ID, contStr}
+			networkStr := fmt.Sprint(container.Networks)
+			//stateStr := fmt.Sprint(container.State)
+
+			stateStr := fmt.Sprint(container.SizeRw)
+
+			p := dockerInfo{container.ID, contStr, networkStr, stateStr}
 			return p
 		}
 	}
@@ -227,6 +234,7 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 			log.Error("err in fetching container Statistics: ", containerId, err)
 			continue
 		}
+
 		// HCS V1 is for docker runtime. Add the docker:// prefix on container_id
 		//add method for container info
 		containerInfo := listContainers(client, containerId)
@@ -281,13 +289,18 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		)
 
 		if len(cstats.Network) == 0 {
-			log.Info("No Network Stats for container: ", containerId)
+			log.Info("Network get BytesReceived: ", cstats.Network)
 			continue
 		}
-		
+
 		networkStats := cstats.Network
 
+		log.Info("Network get BytesReceived: ", cstats.Network)
+
+		//log.Info("Network get Storage: ",)
+
 		for _, networkInterface := range networkStats {
+
 			ch <- prometheus.MustNewConstMetric(
 				c.BytesReceived,
 				prometheus.CounterValue,
