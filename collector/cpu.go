@@ -3,6 +3,7 @@
 package collector
 
 import (
+	"os"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -54,25 +55,25 @@ func newCPUCollector() (Collector, error) {
 			CStateSecondsTotal: prometheus.NewDesc(
 				prometheus.BuildFQName(Namespace, subsystem, "cstate_seconds_total"),
 				"Time spent in low-power idle state",
-				[]string{"core", "state"},
+				[]string{"core", "state", "hostname"},
 				nil,
 			),
 			TimeTotal: prometheus.NewDesc(
 				prometheus.BuildFQName(Namespace, subsystem, "time_total"),
 				"Time that processor spent in different modes (idle, user, system, ...)",
-				[]string{"core", "mode"},
+				[]string{"core", "mode", "hostname"},
 				nil,
 			),
 			InterruptsTotal: prometheus.NewDesc(
 				prometheus.BuildFQName(Namespace, subsystem, "interrupts_total"),
 				"Total number of received and serviced hardware interrupts",
-				[]string{"core"},
+				[]string{"core", "hostname"},
 				nil,
 			),
 			DPCsTotal: prometheus.NewDesc(
 				prometheus.BuildFQName(Namespace, subsystem, "dpcs_total"),
 				"Total number of received and serviced deferred procedure calls (DPCs)",
-				[]string{"core"},
+				[]string{"core", "hostname"},
 				nil,
 			),
 		}, nil
@@ -82,55 +83,55 @@ func newCPUCollector() (Collector, error) {
 		CStateSecondsTotal: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "cstate_seconds_total"),
 			"Time spent in low-power idle state",
-			[]string{"core", "state"},
+			[]string{"core", "state", "hostname"},
 			nil,
 		),
 		TimeTotal: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "time_total"),
 			"Time that processor spent in different modes (idle, user, system, ...)",
-			[]string{"core", "mode"},
+			[]string{"core", "mode", "hostname"},
 			nil,
 		),
 		InterruptsTotal: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "interrupts_total"),
 			"Total number of received and serviced hardware interrupts",
-			[]string{"core"},
+			[]string{"core", "hostname"},
 			nil,
 		),
 		DPCsTotal: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "dpcs_total"),
 			"Total number of received and serviced deferred procedure calls (DPCs)",
-			[]string{"core"},
+			[]string{"core", "hostname"},
 			nil,
 		),
 		ClockInterruptsTotal: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "clock_interrupts_total"),
 			"Total number of received and serviced clock tick interrupts",
-			[]string{"core"},
+			[]string{"core", "hostname"},
 			nil,
 		),
 		IdleBreakEventsTotal: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "idle_break_events_total"),
 			"Total number of time processor was woken from idle",
-			[]string{"core"},
+			[]string{"core", "hostname"},
 			nil,
 		),
 		ParkingStatus: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "parking_status"),
 			"Parking Status represents whether a processor is parked or not",
-			[]string{"core"},
+			[]string{"core", "hostname"},
 			nil,
 		),
 		ProcessorFrequencyMHz: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "core_frequency_mhz"),
 			"Core frequency in megahertz",
-			[]string{"core"},
+			[]string{"core", "hostname"},
 			nil,
 		),
 		ProcessorPerformance: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "processor_performance"),
 			"Processor Performance is the average performance of the processor while it is executing instructions, as a percentage of the nominal performance of the processor. On some processors, Processor Performance may exceed 100%",
-			[]string{"core"},
+			[]string{"core", "hostname"},
 			nil,
 		),
 	}, nil
@@ -162,6 +163,12 @@ func (c *cpuCollectorBasic) Collect(ctx *ScrapeContext, ch chan<- prometheus.Met
 		return err
 	}
 
+	//Type used os get hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
 	for _, cpu := range data {
 		if strings.Contains(strings.ToLower(cpu.Name), "_total") {
 			continue
@@ -172,63 +179,63 @@ func (c *cpuCollectorBasic) Collect(ctx *ScrapeContext, ch chan<- prometheus.Met
 			c.CStateSecondsTotal,
 			prometheus.CounterValue,
 			cpu.PercentC1Time,
-			core, "c1",
+			core, "c1", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.CStateSecondsTotal,
 			prometheus.CounterValue,
 			cpu.PercentC2Time,
-			core, "c2",
+			core, "c2", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.CStateSecondsTotal,
 			prometheus.CounterValue,
 			cpu.PercentC3Time,
-			core, "c3",
+			core, "c3", hostname,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.PercentIdleTime,
-			core, "idle",
+			core, "idle", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.PercentInterruptTime,
-			core, "interrupt",
+			core, "interrupt", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.PercentDPCTime,
-			core, "dpc",
+			core, "dpc", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.PercentPrivilegedTime,
-			core, "privileged",
+			core, "privileged", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.PercentUserTime,
-			core, "user",
+			core, "user", hostname,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.InterruptsTotal,
 			prometheus.CounterValue,
 			cpu.Interrupts,
-			core,
+			core, hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.DPCsTotal,
 			prometheus.CounterValue,
 			cpu.DPCsQueued,
-			core,
+			core, hostname,
 		)
 	}
 
@@ -269,6 +276,12 @@ func (c *cpuCollectorFull) Collect(ctx *ScrapeContext, ch chan<- prometheus.Metr
 		return err
 	}
 
+	//Type used os get hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
 	for _, cpu := range data {
 		if strings.Contains(strings.ToLower(cpu.Name), "_total") {
 			continue
@@ -279,95 +292,95 @@ func (c *cpuCollectorFull) Collect(ctx *ScrapeContext, ch chan<- prometheus.Metr
 			c.CStateSecondsTotal,
 			prometheus.CounterValue,
 			cpu.C1TimeSeconds,
-			core, "c1",
+			core, "c1", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.CStateSecondsTotal,
 			prometheus.CounterValue,
 			cpu.C2TimeSeconds,
-			core, "c2",
+			core, "c2", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.CStateSecondsTotal,
 			prometheus.CounterValue,
 			cpu.C3TimeSeconds,
-			core, "c3",
+			core, "c3", hostname,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.IdleTimeSeconds,
-			core, "idle",
+			core, "idle", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.InterruptTimeSeconds,
-			core, "interrupt",
+			core, "interrupt", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.DPCTimeSeconds,
-			core, "dpc",
+			core, "dpc", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.PrivilegedTimeSeconds,
-			core, "privileged",
+			core, "privileged", hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeTotal,
 			prometheus.CounterValue,
 			cpu.UserTimeSeconds,
-			core, "user",
+			core, "user", hostname,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.InterruptsTotal,
 			prometheus.CounterValue,
 			cpu.InterruptsTotal,
-			core,
+			core, hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.DPCsTotal,
 			prometheus.CounterValue,
 			cpu.DPCsQueuedTotal,
-			core,
+			core, hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.ClockInterruptsTotal,
 			prometheus.CounterValue,
 			cpu.ClockInterruptsTotal,
-			core,
+			core, hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.IdleBreakEventsTotal,
 			prometheus.CounterValue,
 			cpu.IdleBreakEventsTotal,
-			core,
+			core, hostname,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.ParkingStatus,
 			prometheus.GaugeValue,
 			cpu.ParkingStatus,
-			core,
+			core, hostname,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.ProcessorFrequencyMHz,
 			prometheus.GaugeValue,
 			cpu.ProcessorFrequencyMHz,
-			core,
+			core, hostname,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			c.ProcessorPerformance,
 			prometheus.GaugeValue,
 			cpu.ProcessorPerformance,
-			core,
+			core, hostname,
 		)
 	}
 
