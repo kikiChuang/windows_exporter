@@ -3,6 +3,8 @@
 package collector
 
 import (
+	"os"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -29,37 +31,37 @@ func NewSystemCollector() (Collector, error) {
 		ContextSwitchesTotal: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "context_switches_total"),
 			"Total number of context switches (WMI source: PerfOS_System.ContextSwitchesPersec)",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		ExceptionDispatchesTotal: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "exception_dispatches_total"),
 			"Total number of exceptions dispatched (WMI source: PerfOS_System.ExceptionDispatchesPersec)",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		ProcessorQueueLength: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "processor_queue_length"),
 			"Length of processor queue (WMI source: PerfOS_System.ProcessorQueueLength)",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		SystemCallsTotal: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "system_calls_total"),
 			"Total number of system calls (WMI source: PerfOS_System.SystemCallsPersec)",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		SystemUpTime: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "system_up_time"),
 			"System boot time (WMI source: PerfOS_System.SystemUpTime)",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		Threads: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "threads"),
 			"Current number of threads (WMI source: PerfOS_System.Threads)",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 	}, nil
@@ -92,35 +94,47 @@ func (c *SystemCollector) collect(ctx *ScrapeContext, ch chan<- prometheus.Metri
 		return nil, err
 	}
 
+	//Type used os get hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
 	ch <- prometheus.MustNewConstMetric(
 		c.ContextSwitchesTotal,
 		prometheus.CounterValue,
 		dst[0].ContextSwitchesPersec,
+		hostname,
 	)
 	ch <- prometheus.MustNewConstMetric(
 		c.ExceptionDispatchesTotal,
 		prometheus.CounterValue,
 		dst[0].ExceptionDispatchesPersec,
+		hostname,
 	)
 	ch <- prometheus.MustNewConstMetric(
 		c.ProcessorQueueLength,
 		prometheus.GaugeValue,
 		dst[0].ProcessorQueueLength,
+		hostname,
 	)
 	ch <- prometheus.MustNewConstMetric(
 		c.SystemCallsTotal,
 		prometheus.CounterValue,
 		dst[0].SystemCallsPersec,
+		hostname,
 	)
 	ch <- prometheus.MustNewConstMetric(
 		c.SystemUpTime,
 		prometheus.GaugeValue,
 		dst[0].SystemUpTime,
+		hostname,
 	)
 	ch <- prometheus.MustNewConstMetric(
 		c.Threads,
 		prometheus.GaugeValue,
 		dst[0].Threads,
+		hostname,
 	)
 	return nil, nil
 }
