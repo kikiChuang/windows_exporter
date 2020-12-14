@@ -47,7 +47,7 @@ build_script:
       make crossbuild
       # GH requires all files to have different names, so add version/arch to differentiate
       foreach($Arch in "amd64","386") {
-        Rename-Item output\$Arch\windows_exporter.exe -NewName windows_exporter-$Version-$Arch.exe
+        Rename-Item output\$Arch\windows_exporter.exe -NewName windows_exporter.exe
       }
 
 after_build:
