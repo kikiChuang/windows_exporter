@@ -4,6 +4,7 @@ package collector
 
 import (
 	"errors"
+	"os"
 	"time"
 
 	"github.com/StackExchange/wmi"
@@ -40,79 +41,79 @@ func NewOSCollector() (Collector, error) {
 		OSInformation: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "info"),
 			"OperatingSystem.Caption, OperatingSystem.Version",
-			[]string{"product", "version"},
+			[]string{"product", "version", "hostname"},
 			nil,
 		),
 		PagingLimitBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "paging_limit_bytes"),
 			"OperatingSystem.SizeStoredInPagingFiles",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		PagingFreeBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "paging_free_bytes"),
 			"OperatingSystem.FreeSpaceInPagingFiles",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		PhysicalMemoryFreeBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "physical_memory_free_bytes"),
 			"OperatingSystem.FreePhysicalMemory",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		Time: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "time"),
 			"OperatingSystem.LocalDateTime",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		Timezone: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "timezone"),
 			"OperatingSystem.LocalDateTime",
-			[]string{"timezone"},
+			[]string{"timezone", "hostname"},
 			nil,
 		),
 		Processes: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "processes"),
 			"OperatingSystem.NumberOfProcesses",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		ProcessesLimit: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "processes_limit"),
 			"OperatingSystem.MaxNumberOfProcesses",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		ProcessMemoryLimitBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "process_memory_limix_bytes"),
 			"OperatingSystem.MaxProcessMemorySize",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		Users: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "users"),
 			"OperatingSystem.NumberOfUsers",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		VirtualMemoryBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "virtual_memory_bytes"),
 			"OperatingSystem.TotalVirtualMemorySize",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		VisibleMemoryBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "visible_memory_bytes"),
 			"OperatingSystem.TotalVisibleMemorySize",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 		VirtualMemoryFreeBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "virtual_memory_free_bytes"),
 			"OperatingSystem.FreeVirtualMemory",
-			nil,
+			[]string{"hostname"},
 			nil,
 		),
 	}, nil
@@ -157,18 +158,26 @@ func (c *OSCollector) collect(ch chan<- prometheus.Metric) (*prometheus.Desc, er
 		return nil, errors.New("WMI query returned empty result set")
 	}
 
+	//Type used os get hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+
 	ch <- prometheus.MustNewConstMetric(
 		c.OSInformation,
 		prometheus.GaugeValue,
 		1.0,
 		dst[0].Caption,
 		dst[0].Version,
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.PhysicalMemoryFreeBytes,
 		prometheus.GaugeValue,
 		float64(dst[0].FreePhysicalMemory*1024), // KiB -> bytes
+		hostname,
 	)
 
 	time := dst[0].LocalDateTime
@@ -177,6 +186,7 @@ func (c *OSCollector) collect(ch chan<- prometheus.Metric) (*prometheus.Desc, er
 		c.Time,
 		prometheus.GaugeValue,
 		float64(time.Unix()),
+		hostname,
 	)
 
 	timezoneName, _ := time.Zone()
@@ -186,60 +196,70 @@ func (c *OSCollector) collect(ch chan<- prometheus.Metric) (*prometheus.Desc, er
 		prometheus.GaugeValue,
 		1.0,
 		timezoneName,
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.PagingFreeBytes,
 		prometheus.GaugeValue,
 		float64(dst[0].FreeSpaceInPagingFiles*1024), // KiB -> bytes
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.VirtualMemoryFreeBytes,
 		prometheus.GaugeValue,
 		float64(dst[0].FreeVirtualMemory*1024), // KiB -> bytes
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.ProcessesLimit,
 		prometheus.GaugeValue,
 		float64(dst[0].MaxNumberOfProcesses),
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.ProcessMemoryLimitBytes,
 		prometheus.GaugeValue,
 		float64(dst[0].MaxProcessMemorySize*1024), // KiB -> bytes
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.Processes,
 		prometheus.GaugeValue,
 		float64(dst[0].NumberOfProcesses),
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.Users,
 		prometheus.GaugeValue,
 		float64(dst[0].NumberOfUsers),
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.PagingLimitBytes,
 		prometheus.GaugeValue,
 		float64(dst[0].SizeStoredInPagingFiles*1024), // KiB -> bytes
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.VirtualMemoryBytes,
 		prometheus.GaugeValue,
 		float64(dst[0].TotalVirtualMemorySize*1024), // KiB -> bytes
+		hostname,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.VisibleMemoryBytes,
 		prometheus.GaugeValue,
 		float64(dst[0].TotalVisibleMemorySize*1024), // KiB -> bytes
+		hostname,
 	)
 
 	return nil, nil
