@@ -48,10 +48,12 @@ type ContainerMetricsCollector struct {
 
 //info docker info
 type dockerInfo struct {
-	id      string
-	name    string
-	network string
-	states  string
+	id        string
+	name      string
+	network   string
+	states    string
+	namespace string
+	podname   string
 }
 
 //PowerShell script
@@ -194,7 +196,7 @@ func containerClose(c hcsshim.Container) {
 // get docker container info
 func listContainers(client *docker.Client, containerID string) dockerInfo {
 	opts := docker.ListContainersOptions{}
-	p := dockerInfo{"", "", "", ""}
+	p := dockerInfo{"", "", "", "", "", ""}
 	containers, err := client.ListContainers(opts)
 	if err != nil {
 		panic(err)
@@ -202,6 +204,12 @@ func listContainers(client *docker.Client, containerID string) dockerInfo {
 
 	for _, container := range containers {
 		if container.ID == containerID {
+
+			dinfo, err := client.InspectContainer(container.ID)
+			if err != nil {
+				log.Fatal(err)
+				continue
+			}
 
 			contStr := fmt.Sprint(container.Names)
 			contStr = strings.ReplaceAll(contStr, "[", "")
@@ -213,7 +221,7 @@ func listContainers(client *docker.Client, containerID string) dockerInfo {
 
 			stateStr := fmt.Sprint(container.SizeRw)
 
-			p := dockerInfo{container.ID, contStr, networkStr, stateStr}
+			p := dockerInfo{container.ID, contStr, networkStr, stateStr, dinfo.Config.Labels["io.kubernetes.pod.namespace"], dinfo.Config.Labels["io.kubernetes.pod.name"]}
 			return p
 		}
 	}
@@ -274,23 +282,8 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		//add method for container info
 		containerInfo := listContainers(client, containerId)
 
-		namespacecmd := fmt.Sprintf(`docker inspect %s --format='{{index .Config.Labels \"io.kubernetes.pod.namespace\"}}'`, containerId[0:10])
-		podnamecmd := fmt.Sprintf(`docker inspect %s --format='{{index .Config.Labels \"io.kubernetes.pod.name\"}}'`, containerId[0:10])
-
-		posh := New()
-		stdnamespaceout, stderr, err := posh.Execute(namespacecmd)
-		if err != nil {
-			log.Error("stdnamespaceout ", stdnamespaceout, stderr, err)
-			continue
-		}
-		stdnamespaceout = strings.Replace(stdnamespaceout, "\n", "", -1)
-
-		podnameout, podnameserr, podnameerr := posh.Execute(podnamecmd)
-		if err != nil {
-			log.Error("podnamecmd ", podnameout, podnameserr, podnameerr)
-			continue
-		}
-		podnameout = strings.Replace(podnameout, "\n", "", -1)
+		stdnamespaceout := containerInfo.namespace
+		podnameout := containerInfo.podname
 
 		if containerInfo.name != "" {
 			containerId = containerInfo.name
