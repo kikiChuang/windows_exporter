@@ -1,0 +1,27 @@
+jobs:
+- job: Build
+  variables:
+    branch: $(Build.SourceBranchName)
+  workspace:
+    clean: all
+  pool:
+    name: DockerAgents VS2019 Test
+  steps:
+  - task: CmdLine@2
+    inputs:
+      script: |
+        go get -u github.com/prometheus/promu
+        go get -u github.com/josephspurrier/goversioninfo/cmd/goversioninfo
+      workingDirectory: 'C:\\'
+    displayName: go get repo
+  - task: CmdLine@2
+    inputs:
+      script: |
+        go build -o $(build.artifactstagingdirectory)\windows_exporter.exe
+      workingDirectory: '$(Build.SourcesDirectory)'
+    displayName: build windows_exporter
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'
