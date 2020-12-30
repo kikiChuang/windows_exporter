@@ -3,11 +3,10 @@
 package collector
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,6 +35,9 @@ type ContainerMetricsCollector struct {
 	RuntimeTotal  *prometheus.Desc
 	RuntimeUser   *prometheus.Desc
 	RuntimeKernel *prometheus.Desc
+	// CPU Windows
+	cpuPercent *prometheus.Desc
+	memPercent *prometheus.Desc
 
 	// Network
 	BytesReceived          *prometheus.Desc
@@ -48,40 +50,14 @@ type ContainerMetricsCollector struct {
 
 //info docker info
 type dockerInfo struct {
-	id        string
-	name      string
-	network   string
-	states    string
-	namespace string
-	podname   string
-}
-
-//PowerShell script
-type PowerShell struct {
-	powerShell string
-}
-
-//New func
-func New() *PowerShell {
-	ps, _ := exec.LookPath("powershell.exe")
-	return &PowerShell{
-		powerShell: ps,
-	}
-}
-
-//Execute func
-func (p *PowerShell) Execute(args ...string) (stdOut string, stdErr string, err error) {
-	args = append([]string{"-NoProfile", "-NonInteractive"}, args...)
-	cmd := exec.Command(p.powerShell, args...)
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err = cmd.Run()
-	stdOut, stdErr = stdout.String(), stderr.String()
-	return
+	id         string
+	name       string
+	network    string
+	states     string
+	namespace  string
+	podname    string
+	cpuPercent float64
+	memPercent float64
 }
 
 // NewContainerMetricsCollector constructs a new ContainerMetricsCollector
@@ -115,6 +91,18 @@ func NewContainerMetricsCollector() (Collector, error) {
 		UsagePrivateWorkingSetBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "memory_usage_private_working_set_bytes"),
 			"Memory Usage Private Working Set Bytes",
+			[]string{"container_id", "hostname", "namespace", "podname"},
+			nil,
+		),
+		memPercent: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "memory_usage_memPercent"),
+			"Memory Usage Private Working memPercent",
+			[]string{"container_id", "hostname", "namespace", "podname"},
+			nil,
+		),
+		cpuPercent: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "cpu_usage_cpuPercent"),
+			"Total cpuPercent",
 			[]string{"container_id", "hostname", "namespace", "podname"},
 			nil,
 		),
@@ -196,7 +184,7 @@ func containerClose(c hcsshim.Container) {
 // get docker container info
 func listContainers(client *docker.Client, containerID string) dockerInfo {
 	opts := docker.ListContainersOptions{}
-	p := dockerInfo{"", "", "", "", "", ""}
+	p := dockerInfo{"", "", "", "", "", "", 0.0, 0.0}
 	containers, err := client.ListContainers(opts)
 	if err != nil {
 		panic(err)
@@ -211,6 +199,60 @@ func listContainers(client *docker.Client, containerID string) dockerInfo {
 				continue
 			}
 
+			statsChan := make(chan *docker.Stats)
+			doneChan := make(chan bool)
+
+			statsOpts := docker.StatsOptions{
+				ID:     container.ID[0:10], // Replace container ID here
+				Stats:  statsChan,
+				Done:   doneChan,
+				Stream: false,
+			}
+
+			go func() {
+				err := client.Stats(statsOpts)
+				if err != nil {
+					// panic: io: read/write on closed pipe
+					//panic(err)
+				}
+			}()
+
+			time.Sleep(2 * time.Second)
+
+			doneChan <- true
+			stats := <-statsChan
+
+			//close(statsChan)  // client.Stats() will close it
+			close(doneChan)
+
+			cpuPercent := 0.0
+			memPercent := 0.0
+
+			if stats != nil {
+				// Refer from
+				// https://github.com/docker/cli/blob/5c5cdd0e3665f9dfa32eb2f0de136c262b811803/cli/command/container/stats_helpers.go#L187-L201
+
+				possIntervals := uint64(stats.Read.Sub(stats.PreRead).Nanoseconds())
+
+				possIntervals /= 100                    // Convert to number of 100ns intervals
+				possIntervals *= uint64(stats.NumProcs) // Multiple by the number of processors
+
+				// Intervals used
+				intervalsUsed := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
+
+				// Percentage avoiding divide-by-zero
+				if possIntervals > 0 {
+					cpuPercent = float64(intervalsUsed) / float64(possIntervals) * 100.0
+				}
+				//windows mem
+				memPercent = float64(stats.MemoryStats.PrivateWorkingSet)
+
+				log.Info("container.ID[0:10]t=", container.ID[0:10])
+				log.Info("cpuPercent ", cpuPercent)
+				log.Info("memPercent ", memPercent)
+
+			}
+
 			contStr := fmt.Sprint(container.Names)
 			contStr = strings.ReplaceAll(contStr, "[", "")
 			contStr = strings.ReplaceAll(contStr, "]", "")
@@ -220,8 +262,7 @@ func listContainers(client *docker.Client, containerID string) dockerInfo {
 			//stateStr := fmt.Sprint(container.State)
 
 			stateStr := fmt.Sprint(container.SizeRw)
-
-			p := dockerInfo{container.ID, contStr, networkStr, stateStr, dinfo.Config.Labels["io.kubernetes.pod.namespace"], dinfo.Config.Labels["io.kubernetes.pod.name"]}
+			p := dockerInfo{container.ID, contStr, networkStr, stateStr, dinfo.Config.Labels["io.kubernetes.pod.namespace"], dinfo.Config.Labels["io.kubernetes.pod.name"], cpuPercent, memPercent}
 			return p
 		}
 	}
@@ -315,6 +356,21 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 			float64(cstats.Memory.UsagePrivateWorkingSetBytes),
 			containerId, hostname, stdnamespaceout, podnameout,
 		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.memPercent,
+			prometheus.GaugeValue,
+			containerInfo.memPercent,
+			containerId, hostname, stdnamespaceout, podnameout,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.cpuPercent,
+			prometheus.CounterValue,
+			containerInfo.cpuPercent,
+			containerId, hostname, stdnamespaceout, podnameout,
+		)
+
 		ch <- prometheus.MustNewConstMetric(
 			c.RuntimeTotal,
 			prometheus.CounterValue,
@@ -341,9 +397,9 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 
 		networkStats := cstats.Network
 
-		log.Info("Network get BytesReceived: ", cstats.Network)
+		//log.Info("Network get BytesReceived: ", cstats.Network)
 
-		//log.Info("Network get Storage: ",)
+		//log.Info("Network get Storage: ", cstats.Processor.TotalRuntime100ns)
 
 		for _, networkInterface := range networkStats {
 
