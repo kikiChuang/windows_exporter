@@ -64,10 +64,11 @@ type dockerInfo struct {
 }
 
 type myStruct struct {
-	Id       string `json:"id"`
-	Read     string `json:"read"`
-	Preread  string `json:"preread"`
-	CpuStats cpu    `json:"cpu_stats"`
+	Id          string `json:"id"`
+	Read        string `json:"read"`
+	Preread     string `json:"preread"`
+	CpuStats    cpu    `json:"cpu_stats"`
+	PrecpuStats cpu    `json:"precpu_stats"`
 }
 
 type cpu struct {
@@ -77,7 +78,6 @@ type cpu struct {
 type cpuUsage struct {
 	Total float64 `json:"total_usage"`
 }
-
 
 // NewContainerMetricsCollector constructs a new ContainerMetricsCollector
 func NewContainerMetricsCollector() (Collector, error) {
@@ -354,9 +354,10 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 
 		var containerStats myStruct
 		json.NewDecoder(stats.Body).Decode(&containerStats)
-
 		log.Info("containerStats.Id: ", containerStats.Id)
 		log.Info("CpuStats.Usage.Total: ", containerStats.CpuStats.Usage.Total)
+		log.Info("PrecpuStats.Usage.Total: ", containerStats.PrecpuStats.Usage.Total)
+
 		//log.Info("containerStats: ", containerStats)
 		//log.Info("containerStats.Body: ", containerStats.Body)
 
