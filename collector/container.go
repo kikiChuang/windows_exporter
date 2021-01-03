@@ -3,18 +3,17 @@
 package collector
 
 import (
-	// "context"
+	"context"
 	"fmt"
 	"os"
 	"strings"
+    "bytes"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 
-	// client "github.com/docker/docker/client"
-
-	"time"
+	client "github.com/docker/docker/client"
 
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -204,59 +203,59 @@ func listContainers(client *docker.Client, containerID string) dockerInfo {
 				continue
 			}
 
-			statsChan := make(chan *docker.Stats)
-			doneChan := make(chan bool)
+			// statsChan := make(chan *docker.Stats)
+			// doneChan := make(chan bool)
 
-			statsOpts := docker.StatsOptions{
-				ID:     container.ID[0:10], // Replace container ID here
-				Stats:  statsChan,
-				Done:   doneChan,
-				Stream: true,
-			}
+			// statsOpts := docker.StatsOptions{
+			// 	ID:     container.ID[0:10], // Replace container ID here
+			// 	Stats:  statsChan,
+			// 	Done:   doneChan,
+			// 	Stream: false,
+			// }
 
-			go func() {
-				err := client.Stats(statsOpts)
-				if err != nil {
-					// panic: io: read/write on closed pipe
-					//panic(err)
-				}
-			}()
+			// go func() {
+			// 	err := client.Stats(statsOpts)
+			// 	if err != nil {
+			// 		// panic: io: read/write on closed pipe
+			// 		//panic(err)
+			// 	}
+			// }()
 
-			time.Sleep(2 * time.Second)
+			// time.Sleep(2 * time.Second)
 
-			doneChan <- true
-			stats := <-statsChan
+			// doneChan <- true
+			// stats := <-statsChan
 
-			//close(statsChan)  // client.Stats() will close it
-			close(doneChan)
+			// //close(statsChan)  // client.Stats() will close it
+			// close(doneChan)
 
-			cpuPercent := 0.0
-			memPercent := 0.0
+			// cpuPercent := 0.0
+			// memPercent := 0.0
 
-			if stats != nil {
-				// Refer from
-				// https://github.com/docker/cli/blob/5c5cdd0e3665f9dfa32eb2f0de136c262b811803/cli/command/container/stats_helpers.go#L187-L201
+			// if stats != nil {
+			// 	// Refer from
+			// 	// https://github.com/docker/cli/blob/5c5cdd0e3665f9dfa32eb2f0de136c262b811803/cli/command/container/stats_helpers.go#L187-L201
 
-				possIntervals := uint64(stats.Read.Sub(stats.PreRead).Nanoseconds())
+			// 	possIntervals := uint64(stats.Read.Sub(stats.PreRead).Nanoseconds())
 
-				possIntervals /= 100                    // Convert to number of 100ns intervals
-				possIntervals *= uint64(stats.NumProcs) // Multiple by the number of processors
+			// 	possIntervals /= 100                    // Convert to number of 100ns intervals
+			// 	possIntervals *= uint64(stats.NumProcs) // Multiple by the number of processors
 
-				// Intervals used
-				intervalsUsed := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
+			// 	// Intervals used
+			// 	intervalsUsed := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
 
-				// Percentage avoiding divide-by-zero
-				if possIntervals > 0 {
-					cpuPercent = float64(intervalsUsed) / float64(possIntervals) * 100.0
-				}
-				//windows mem
-				memPercent = float64(stats.MemoryStats.PrivateWorkingSet)
+			// 	// Percentage avoiding divide-by-zero
+			// 	if possIntervals > 0 {
+			// 		cpuPercent = float64(intervalsUsed) / float64(possIntervals) * 100.0
+			// 	}
+			// 	//windows mem
+			// 	memPercent = float64(stats.MemoryStats.PrivateWorkingSet)
 
-				log.Info("container.ID[0:10]t=", container.ID[0:10])
-				log.Info("cpuPercent ", cpuPercent)
-				log.Info("memPercent ", memPercent)
+			// 	log.Info("container.ID[0:10]t=", container.ID[0:10])
+			// 	log.Info("cpuPercent ", cpuPercent)
+			// 	log.Info("memPercent ", memPercent)
 
-			}
+			// }
 
 			contStr := fmt.Sprint(container.Names)
 			contStr = strings.ReplaceAll(contStr, "[", "")
@@ -267,7 +266,7 @@ func listContainers(client *docker.Client, containerID string) dockerInfo {
 			//stateStr := fmt.Sprint(container.State)
 
 			stateStr := fmt.Sprint(container.SizeRw)
-			p := dockerInfo{container.ID, contStr, networkStr, stateStr, dinfo.Config.Labels["io.kubernetes.pod.namespace"], dinfo.Config.Labels["io.kubernetes.pod.name"], cpuPercent, memPercent}
+			p := dockerInfo{container.ID, contStr, networkStr, stateStr, dinfo.Config.Labels["io.kubernetes.pod.namespace"], dinfo.Config.Labels["io.kubernetes.pod.name"], 0.07, 0.06}
 			return p
 		}
 	}
@@ -296,11 +295,11 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 	}
 
 	//client
-	// ctx := context.Background()
-	// cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	// if err != nil {
-	// 	panic(err)
-	// }
+	ctx := context.Background()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
 
 	//Types used docker api get container info
 	client, err := docker.NewClientFromEnv()
@@ -332,13 +331,19 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		}
 
 		//container
-		// containerStats, err := cli.ContainerStats(ctx, containerId, true)
-		// if err != nil {
-		// 	panic(err)
-		// }
+		containerStats, err := cli.ContainerStats(ctx, containerId, true)
+		if err != nil {
+			panic(err)
+		}
 
-		// log.Info("containerStats: ", containerStats)
-		// log.Info("containerStats.Body: ", containerStats.Body)
+		log.Info("containerStats: ", containerStats)
+		log.Info("containerStats.Body: ", containerStats.Body)
+
+		buf := new(bytes.Buffer)
+		//io.ReadCloser 转换成 Buffer 然后转换成json字符串
+		buf.ReadFrom(containerStats.Body)
+		newStr := buf.String()
+		log.Info("newStr",newStr)
 
 		// HCS V1 is for docker runtime. Add the docker:// prefix on container_id
 		//add method for container info
