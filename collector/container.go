@@ -69,6 +69,11 @@ type myStruct struct {
 	Preread     string `json:"preread"`
 	CpuStats    cpu    `json:"cpu_stats"`
 	PrecpuStats cpu    `json:"precpu_stats"`
+	MemoryStats MemoryStats `json:"memory_stats"`
+}
+
+type MemoryStats struct {
+	PrivateWorkingSet uint64 `json:"privateworkingset"`
 }
 
 type cpu struct {
@@ -357,7 +362,7 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		log.Info("containerStats.Id: ", containerStats.Id)
 		log.Info("CpuStats.Usage.Total: ", containerStats.CpuStats.Usage.Total)
 		log.Info("PrecpuStats.Usage.Total: ", containerStats.PrecpuStats.Usage.Total)
-
+		log.Info("PrecpuStats.Usage.Total: ", containerStats.MemoryStats.PrivateWorkingSet)
 		//log.Info("containerStats: ", containerStats)
 		//log.Info("containerStats.Body: ", containerStats.Body)
 
