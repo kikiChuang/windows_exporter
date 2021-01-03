@@ -346,6 +346,7 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		json.NewDecoder(stats.Body).Decode(&containerStats)
 
 		log.Info("containerStats.Id: ", containerStats.Id)
+		log.Info("CpuStats.Usage.Total: ", containerStats.CpuStats.Usage.Total)
 		//log.Info("containerStats: ", containerStats)
 		//log.Info("containerStats.Body: ", containerStats.Body)
 
