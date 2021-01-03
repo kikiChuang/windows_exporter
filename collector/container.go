@@ -337,7 +337,7 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		}
 
 		//container
-		stats, err := cli.ContainerStats(ctx, containerId, false)
+		stats, err := cli.ContainerStats(ctx, containerId, true)
 		if err != nil {
 			panic(err)
 		}
