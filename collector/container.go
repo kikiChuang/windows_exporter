@@ -4,11 +4,10 @@ package collector
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-
-	"bytes"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/prometheus/client_golang/prometheus"
@@ -62,6 +61,12 @@ type dockerInfo struct {
 	podname    string
 	cpuPercent float64
 	memPercent float64
+}
+
+type myStruct struct {
+	Id      string `json:"id"`
+	Read    string `json:"read"`
+	Preread string `json:"preread"`
 }
 
 // NewContainerMetricsCollector constructs a new ContainerMetricsCollector
@@ -297,8 +302,7 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 
 	//client
 	ctx := context.Background()
-	//cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	cli, err := client.NewEnvClient()
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		panic(err)
 	}
@@ -333,19 +337,17 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		}
 
 		//container
-		containerStats, err := cli.ContainerStats(ctx, containerId, false)
+		stats, err := cli.ContainerStats(ctx, containerId, false)
 		if err != nil {
 			panic(err)
 		}
 
+		var containerStats myStruct
+		json.NewDecoder(stats.Body).Decode(&containerStats)
+
+		log.Info("containerStats.Id: ", containerStats.Id)
 		//log.Info("containerStats: ", containerStats)
 		//log.Info("containerStats.Body: ", containerStats.Body)
-
-		buf := new(bytes.Buffer)
-		//io.ReadCloser 转换成 Buffer 然后转换成json字符串
-		buf.ReadFrom(containerStats.Body)
-		newStr := buf.String()
-		log.Info("newStr: ", newStr)
 
 		// HCS V1 is for docker runtime. Add the docker:// prefix on container_id
 		//add method for container info
