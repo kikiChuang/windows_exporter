@@ -227,60 +227,6 @@ func listContainers(client *docker.Client, containerID string) dockerInfo {
 				continue
 			}
 
-			// statsChan := make(chan *docker.Stats)
-			// doneChan := make(chan bool)
-
-			// statsOpts := docker.StatsOptions{
-			// 	ID:     container.ID[0:10], // Replace container ID here
-			// 	Stats:  statsChan,
-			// 	Done:   doneChan,
-			// 	Stream: false,
-			// }
-
-			// go func() {
-			// 	err := client.Stats(statsOpts)
-			// 	if err != nil {
-			// 		// panic: io: read/write on closed pipe
-			// 		//panic(err)
-			// 	}
-			// }()
-
-			// time.Sleep(2 * time.Second)
-
-			// doneChan <- true
-			// stats := <-statsChan
-
-			// //close(statsChan)  // client.Stats() will close it
-			// close(doneChan)
-
-			// cpuPercent := 0.0
-			// memPercent := 0.0
-
-			// if stats != nil {
-			// 	// Refer from
-			// 	// https://github.com/docker/cli/blob/5c5cdd0e3665f9dfa32eb2f0de136c262b811803/cli/command/container/stats_helpers.go#L187-L201
-
-			// 	possIntervals := uint64(stats.Read.Sub(stats.PreRead).Nanoseconds())
-
-			// 	possIntervals /= 100                    // Convert to number of 100ns intervals
-			// 	possIntervals *= uint64(stats.NumProcs) // Multiple by the number of processors
-
-			// 	// Intervals used
-			// 	intervalsUsed := stats.CPUStats.CPUUsage.TotalUsage - stats.PreCPUStats.CPUUsage.TotalUsage
-
-			// 	// Percentage avoiding divide-by-zero
-			// 	if possIntervals > 0 {
-			// 		cpuPercent = float64(intervalsUsed) / float64(possIntervals) * 100.0
-			// 	}
-			// 	//windows mem
-			// 	memPercent = float64(stats.MemoryStats.PrivateWorkingSet)
-
-			// 	log.Info("container.ID[0:10]t=", container.ID[0:10])
-			// 	log.Info("cpuPercent ", cpuPercent)
-			// 	log.Info("memPercent ", memPercent)
-
-			// }
-
 			contStr := fmt.Sprint(container.Names)
 			contStr = strings.ReplaceAll(contStr, "[", "")
 			contStr = strings.ReplaceAll(contStr, "]", "")
