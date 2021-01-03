@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/prometheus/client_golang/prometheus"
@@ -64,11 +65,13 @@ type dockerInfo struct {
 }
 
 type myStruct struct {
-	Id          string `json:"id"`
-	Read        string `json:"read"`
-	Preread     string `json:"preread"`
-	CpuStats    cpu    `json:"cpu_stats"`
-	PrecpuStats cpu    `json:"precpu_stats"`
+	Id       string    `json:"id"`
+	Read     time.Time `json:"read"`
+	Preread  time.Time `json:"preread"`
+	NumProcs uint32    `json:"num_procs"`
+
+	CpuStats    cpu         `json:"cpu_stats"`
+	PrecpuStats cpu         `json:"precpu_stats"`
 	MemoryStats MemoryStats `json:"memory_stats"`
 }
 
@@ -357,12 +360,23 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 			panic(err)
 		}
 
+		cpuPercent := 0.0
+		memPercent := 0.0
 		var containerStats myStruct
 		json.NewDecoder(stats.Body).Decode(&containerStats)
+		possIntervals := uint64(containerStats.Read.Sub(containerStats.Preread).Nanoseconds())
+		possIntervals /= 100
+		possIntervals *= uint64(containerStats.NumProcs)
+		intervalsUsed := containerStats.CpuStats.Usage.Total - containerStats.PrecpuStats.Usage.Total
+		if possIntervals > 0 {
+			cpuPercent = float64(intervalsUsed) / float64(possIntervals) * 100.0
+		}
+
+		memPercent = float64(containerStats.MemoryStats.PrivateWorkingSet)
+
 		log.Info("containerStats.Id: ", containerStats.Id)
-		log.Info("CpuStats.Usage.Total: ", containerStats.CpuStats.Usage.Total)
-		log.Info("PrecpuStats.Usage.Total: ", containerStats.PrecpuStats.Usage.Total)
-		log.Info("PrecpuStats.Usage.Total: ", containerStats.MemoryStats.PrivateWorkingSet)
+		log.Info("memPercent: ", memPercent)
+		log.Info("cpuPercent: ", cpuPercent)
 		//log.Info("containerStats: ", containerStats)
 		//log.Info("containerStats.Body: ", containerStats.Body)
 
@@ -407,14 +421,14 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		ch <- prometheus.MustNewConstMetric(
 			c.memPercent,
 			prometheus.GaugeValue,
-			containerInfo.memPercent,
+			memPercent,
 			containerId, hostname, stdnamespaceout, podnameout,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.cpuPercent,
 			prometheus.CounterValue,
-			containerInfo.cpuPercent,
+			cpuPercent,
 			containerId, hostname, stdnamespaceout, podnameout,
 		)
 
