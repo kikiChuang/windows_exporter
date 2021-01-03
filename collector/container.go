@@ -297,7 +297,8 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 
 	//client
 	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	//cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
 	}
