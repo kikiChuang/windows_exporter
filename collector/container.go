@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
-    "bytes"
+
+	"bytes"
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/prometheus/client_golang/prometheus"
@@ -331,19 +332,19 @@ func (c *ContainerMetricsCollector) collect(ch chan<- prometheus.Metric) (*prome
 		}
 
 		//container
-		containerStats, err := cli.ContainerStats(ctx, containerId, true)
+		containerStats, err := cli.ContainerStats(ctx, containerId, false)
 		if err != nil {
 			panic(err)
 		}
 
-		log.Info("containerStats: ", containerStats)
-		log.Info("containerStats.Body: ", containerStats.Body)
+		//log.Info("containerStats: ", containerStats)
+		//log.Info("containerStats.Body: ", containerStats.Body)
 
 		buf := new(bytes.Buffer)
 		//io.ReadCloser 转换成 Buffer 然后转换成json字符串
 		buf.ReadFrom(containerStats.Body)
 		newStr := buf.String()
-		log.Info("newStr",newStr)
+		log.Info("newStr: ", newStr)
 
 		// HCS V1 is for docker runtime. Add the docker:// prefix on container_id
 		//add method for container info
