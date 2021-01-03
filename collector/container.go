@@ -64,10 +64,20 @@ type dockerInfo struct {
 }
 
 type myStruct struct {
-	Id      string `json:"id"`
-	Read    string `json:"read"`
-	Preread string `json:"preread"`
+	Id       string `json:"id"`
+	Read     string `json:"read"`
+	Preread  string `json:"preread"`
+	CpuStats cpu    `json:"cpu_stats"`
 }
+
+type cpu struct {
+	Usage cpuUsage `json:"cpu_usage"`
+}
+
+type cpuUsage struct {
+	Total float64 `json:"total_usage"`
+}
+
 
 // NewContainerMetricsCollector constructs a new ContainerMetricsCollector
 func NewContainerMetricsCollector() (Collector, error) {
